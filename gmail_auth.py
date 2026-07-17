@@ -7,10 +7,28 @@ future runs don't require a browser at all.
 """
 
 import os
+import socket
+
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
+
+# Prefer IPv4 when the OS has no usable IPv6 address. Otherwise httplib2 can
+# fail with OSError errno 49 ("Can't assign requested address") talking to Google.
+_orig_getaddrinfo = socket.getaddrinfo
+
+
+def _getaddrinfo_ipv4_preferred(host, port, family=0, type=0, proto=0, flags=0):
+    infos = _orig_getaddrinfo(host, port, family, type, proto, flags)
+    if family == 0:
+        ipv4 = [i for i in infos if i[0] == socket.AF_INET]
+        if ipv4:
+            return ipv4 + [i for i in infos if i[0] != socket.AF_INET]
+    return infos
+
+
+socket.getaddrinfo = _getaddrinfo_ipv4_preferred
 
 # Full read/write access (search, read, send, draft, label, delete, archive).
 # Narrow this to ["https://www.googleapis.com/auth/gmail.send"] if you only
